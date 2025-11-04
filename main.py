@@ -1,10 +1,18 @@
 from fastapi import FastAPI, File, UploadFile, Form
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import numpy as np
-import io
+import os
 
 app = FastAPI(title="Image Transformation APP")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = ["*"],
+    allow_methods = ["*"],
+    allow_headers = ["*"],
+)
 
 @app.post("/transform")
 async def transform_image(
@@ -27,17 +35,16 @@ async def transform_image(
 
     rotation_matrix[0, 2] += translate_x
     rotation_matrix[1, 2] += translate_y
-
+  
     transformed = cv2.warpAffine(gray, rotation_matrix, (w, h))
 
     _, buffer = cv2.imencode(".jpg", transformed)
-    io_buf = io.BytesIO(buffer)
-    return StreamingResponse(io_buf, media_type="image/jpeg")
+    return Response(content=buffer.tobytes(), media_type="image/jpeg")
 
+frontend_dir = os.path.join(os.path.dirname(__file__), "client", "dist")
 
-@app.get("/")
-def home():
-    return {"message": "Image Transformation API is running!"}
+if os.path.exists(frontend_dir):
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn
